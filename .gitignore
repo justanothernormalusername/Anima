@@ -1,3 +1,5 @@
 .env
 messages.json
 __pycache__
+sessions/messages
+kernel/

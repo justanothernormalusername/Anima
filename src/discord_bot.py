@@ -8,17 +8,21 @@ from discord.ext import commands
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN is None:
-    raise Exception("Invalid discord token")
-
 # Permissions
 intents = discord.Intents.default()  # Sets default permissions
 intents.members = True  # Enables access to member data
 intents.message_content = True  # Allows bot to read messages (required for most bots)
 intents.presences = True  # Allows bot to see online/offline status
 bot = commands.Bot(command_prefix='hai ', intents=intents)
+
+def run() -> None:
+    """Runs the bot (starts a blocking async loop)"""
+    load_dotenv()
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    if not TOKEN:
+        raise ValueError("Invalid discord token")
+    
+    bot.run(TOKEN)
 
 
 async def split_and_send(message_out: str, channel: discord.abc.Messageable) -> None:
@@ -72,10 +76,12 @@ async def on_message(message: discord.Message) -> None:
 
     logger.info(formatted_input)
     response_message, response_reasoning = await ai.get_response(formatted_input)
-    logger.info("Reasoning: " + response_reasoning)
+    if response_reasoning:
+        logger.info("Reasoning: " + response_reasoning)
     logger.info("Bot: " + response_message)
 
+    # Handle empty string
+    if response_message == "[None]":
+        return
+
     await split_and_send(response_message, message.channel)
-
-
-bot.run(TOKEN)
