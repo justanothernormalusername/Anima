@@ -3,7 +3,11 @@ import os
 import ai
 import logging
 from dotenv import load_dotenv
+from discord import app_commands
 from discord.ext import commands
+
+# Guild ID for testing server
+TEST_GUILD = discord.Object(id=1404538227490295848)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,8 +66,16 @@ async def split_and_send(message_out: str, channel: discord.abc.Messageable) -> 
 
 @bot.event  # An event is an action done by the bot
 async def on_ready() -> None:  # async is a function that runs in the background
+    # Immediately sync slash commands with guild
+    bot.tree.copy_global_to(guild=TEST_GUILD)
+    await bot.tree.sync(guild=TEST_GUILD)
+    
     print(f'{bot.user} has connected to Discord')
 
+
+@bot.tree.command(name="test", description="First test slash command")
+async def test(interaction: discord.Interaction):
+    await interaction.response.send_message("TEST")
 
 @bot.event
 async def on_message(message: discord.Message) -> None:

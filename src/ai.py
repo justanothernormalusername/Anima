@@ -15,7 +15,7 @@ MODEL = "minimax/minimax-m2-her"
 
 MODEL = "deepseek/deepseek-v4.1-flash:nitro"
 
-with open("kernel\\v0.3.md") as f:
+with open("kernel\\v0.4.md") as f:
     PROMPT = f.read()
 
 
