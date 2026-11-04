@@ -1,3 +1,15 @@
 Add system prompt to ai module
 
 ALT + enter to run main
+
+
+11-01
+Wrote its own system prompt, v0.4.md
+Asked for autonomous memory
+
+11-02 Slash commands - info/model
+
+11-03
+Load and backup memory commands
+Working on diary.md
+- 2 tool calls (read/write)

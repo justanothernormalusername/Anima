@@ -69,13 +69,33 @@ async def on_ready() -> None:  # async is a function that runs in the background
     # Immediately sync slash commands with guild
     bot.tree.copy_global_to(guild=TEST_GUILD)
     await bot.tree.sync(guild=TEST_GUILD)
-    
+
     print(f'{bot.user} has connected to Discord')
 
 
-@bot.tree.command(name="test", description="First test slash command")
-async def test(interaction: discord.Interaction):
-    await interaction.response.send_message("TEST")
+@bot.tree.command(name="info", description="Displays the full overview and status")
+async def info(interaction: discord.Interaction) -> None:
+    await interaction.response.send_message(f"Model: __**{ai.MODEL}**__")
+
+@bot.tree.command(name="change_model", description="Switch the AI model")
+async def change_model(interaction: discord.Interaction, model: str) -> None:
+    ai.MODEL = model
+    logger.info("AI model changed to " + model)
+    await interaction.response.send_message(f"AI model changed to **{model}**")
+
+@bot.tree.command(name="load_memory", description="Load a specific memory file")
+async def load_memory(interaction: discord.Interaction, filepath: str) -> None:
+    ai.messages = ai.load_memory(filepath)
+    logger.info("New memories loaded at " + filepath)
+    await interaction.response.send_message(f"New memories loaded at *{filepath}*")
+
+@bot.tree.command(name="backup_memory", description="Backup the current memory file")
+async def backup_memory(interaction: discord.Interaction, filename: str) -> None:
+    filepath = "sessions/messages/" + filename
+    ai.dump_memory(filepath)
+    logger.info("Current memory backed up at " + filepath)
+    await interaction.response.send_message(f"Current memory backed up at *{filepath}*")
+
 
 @bot.event
 async def on_message(message: discord.Message) -> None:
@@ -87,13 +107,15 @@ async def on_message(message: discord.Message) -> None:
     formatted_input = str(message.author) + ": " + user_input
 
     logger.info(formatted_input)
-    response_message, response_reasoning = await ai.get_response(formatted_input)
-    if response_reasoning:
-        logger.info("Reasoning: " + response_reasoning)
-    logger.info("Bot: " + response_message)
 
-    # Handle empty string
-    if response_message == "[None]":
-        return
+    # Iterates over the get_response async generator
+    async for response_message, response_reasoning in ai.get_response(formatted_input):
+        # If model did a tool call
+        if response_message == "tool_call":
+            logger.info("Bot: " + response_reasoning)
+        else:  # No tool call, normal output
+            if response_reasoning:
+                logger.info("Reasoning: " + response_reasoning)
+            logger.info("Bot: " + response_message)
 
-    await split_and_send(response_message, message.channel)
+            await split_and_send(response_message, message.channel)
