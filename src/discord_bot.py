@@ -5,10 +5,18 @@ import logging
 from dotenv import load_dotenv
 from datetime import datetime
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
+
+load_dotenv()
+
+GUILD_ID = os.getenv("GUILD_ID")
+if GUILD_ID is None:
+    raise ValueError("Invalid GUILD_ID")
+
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 # Guild ID for testing server
-TEST_GUILD = discord.Object(id=1404538227490295848)
+TEST_GUILD = discord.Object(id=GUILD_ID)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,13 +28,15 @@ intents.message_content = True  # Allows bot to read messages (required for most
 intents.presences = True  # Allows bot to see online/offline status
 bot = commands.Bot(command_prefix='hai ', intents=intents)
 
+
+
 def run() -> None:
     """Runs the bot (starts a blocking async loop)"""
-    load_dotenv()
+
     TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
         raise ValueError("Invalid discord token")
-    
+
     bot.run(TOKEN)
 
 
@@ -71,6 +81,9 @@ async def on_ready() -> None:  # async is a function that runs in the background
     bot.tree.copy_global_to(guild=TEST_GUILD)
     await bot.tree.sync(guild=TEST_GUILD)
 
+    # Starts the cron job
+    auto_loop.start()
+
     print(f'{bot.user} has connected to Discord')
 
 
@@ -98,6 +111,12 @@ async def backup_memory(interaction: discord.Interaction, filename: str) -> None
     await interaction.response.send_message(f"Current memory backed up at *{filepath}*")
 
 
+@bot.tree.command(name="reflect", description="Trigger agent reflection")
+async def reflect(interaction: discord.Interaction) -> None:
+    await ai.reflect()
+    return
+
+
 @bot.event
 async def on_message(message: discord.Message) -> None:
     if message.author == bot.user:
@@ -120,3 +139,35 @@ async def on_message(message: discord.Message) -> None:
             logger.info("Bot: " + response_message)
 
             await split_and_send(response_message, message.channel)
+
+
+# Auto loop tasks
+@tasks.loop(minutes=1)
+async def auto_loop() -> None:
+    CHANNEL_ID = os.getenv("CHANNEL_ID")
+    if CHANNEL_ID is None:
+        raise ValueError("Invalid GUILD_ID")
+    channel = await bot.fetch_channel(int(CHANNEL_ID))
+    
+    system_input = "Running looping agent activation"
+    print("Running cron job")
+
+    formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] (System) {system_input}"
+    
+    logger.info(formatted_input)
+    
+    # Iterates over the get_response async generator
+    async for response_message, response_reasoning in ai.get_response(formatted_input):
+        # If model did a tool call
+        if response_message == "tool_call":
+            logger.info("Bot: " + response_reasoning)
+        else:  # No tool call, normal output
+            if response_reasoning:
+                logger.info("Reasoning: " + response_reasoning)
+            logger.info("Bot: " + response_message)
+
+            if isinstance(channel, discord.abc.Messageable):
+                await split_and_send(response_message, channel)
+            else:
+                raise TypeError("Channel does not support sending messages")
+

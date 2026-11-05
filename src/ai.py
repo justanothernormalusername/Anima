@@ -98,3 +98,9 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
         else:
             return
 
+
+
+async def reflect() -> None:
+    load_memory("data/reflection_messages.json")
+    raise Exception("Work in progress")
+    dump_memory("data/reflection_messages.json")
