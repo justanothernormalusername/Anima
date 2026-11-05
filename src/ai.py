@@ -17,8 +17,22 @@ MODEL = "minimax/minimax-m2-her"
 
 MODEL = "deepseek/deepseek-v4.1-flash-1017:nitro"
 
-with open("kernel\\v0.4.md") as f:
+with open("kernel/v0.4.md") as f:
     PROMPT = f.read()
+
+def init_memory(save_state: bool = False) -> list:
+    with open("data/messages.json", "w") as f:
+        messages = []
+        if PROMPT:
+            messages.append({"role": "system", "content": PROMPT})
+
+        if save_state:
+            messages.append({"role": "system", "content": "Here is the save state written by your last iteration. "})
+            with open("data/save_state.md", "r") as ff:
+                save_state_raw = ff.read()
+            messages.append({"role": "system", "content": save_state_raw})
+        json.dump(messages, f, indent=4)
+        return messages
 
 def load_memory(filepath: str = "data/messages.json") -> list:
     try:
@@ -27,12 +41,7 @@ def load_memory(filepath: str = "data/messages.json") -> list:
             messages[0] = {"role": "system", "content": PROMPT}
             return messages
     except FileNotFoundError:
-        with open("data/messages.json", "w") as f:
-            messages = []
-            if PROMPT:
-                messages.append({"role": "system", "content": PROMPT})
-            json.dump(messages, f, indent=4)
-            return messages
+        return init_memory()
 
 messages = load_memory()
 

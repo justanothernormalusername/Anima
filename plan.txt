@@ -20,4 +20,9 @@ dated messages
 add save_state tool and file
 modified v4.md to include diary
 - ai requested to always read it start of session
+very simple cron job
 
+11-05
+command to initialize with just prompt and save_state
+
+need to rework manual backups to save all of the data folder

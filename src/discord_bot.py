@@ -82,7 +82,7 @@ async def on_ready() -> None:  # async is a function that runs in the background
     await bot.tree.sync(guild=TEST_GUILD)
 
     # Starts the cron job
-    auto_loop.start()
+    # auto_loop.start()
 
     print(f'{bot.user} has connected to Discord')
 
@@ -109,6 +109,12 @@ async def backup_memory(interaction: discord.Interaction, filename: str) -> None
     ai.dump_memory(filepath)
     logger.info("Current memory backed up at " + filepath)
     await interaction.response.send_message(f"Current memory backed up at *{filepath}*")
+
+@bot.tree.command(name="new_session", description="Create a new session with cleared memory and save_state.md imported")
+async def new_session(interaction: discord.Interaction) -> None:
+    ai.messages = ai.init_memory(True)
+    logger.info("Memories cleared and save state appended")
+    await interaction.response.send_message("Memories cleared and save state appended")
 
 
 @bot.tree.command(name="reflect", description="Trigger agent reflection")
@@ -142,7 +148,7 @@ async def on_message(message: discord.Message) -> None:
 
 
 # Auto loop tasks
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=120)
 async def auto_loop() -> None:
     CHANNEL_ID = os.getenv("CHANNEL_ID")
     if CHANNEL_ID is None:
