@@ -20,14 +20,14 @@ MODEL = "deepseek/deepseek-v4.1-flash-1017:nitro"
 with open("kernel\\v0.4.md") as f:
     PROMPT = f.read()
 
-def load_memory(filepath: str = "messages.json") -> list:
+def load_memory(filepath: str = "data/messages.json") -> list:
     try:
         with open(filepath, "r") as f:
             messages = json.load(f)
             messages[0] = {"role": "system", "content": PROMPT}
             return messages
     except FileNotFoundError:
-        with open("messages.json", "w") as f:
+        with open("data/messages.json", "w") as f:
             messages = []
             if PROMPT:
                 messages.append({"role": "system", "content": PROMPT})
@@ -47,7 +47,7 @@ def make_request() -> requests.models.Response:
         }
     )
 
-def dump_memory(filepath: str = "messages.json") -> None:
+def dump_memory(filepath: str = "data/messages.json") -> None:
     with open(filepath, "w") as f:
         json.dump(messages, f, indent=4)
 

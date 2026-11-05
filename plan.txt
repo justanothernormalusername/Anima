@@ -13,3 +13,11 @@ Asked for autonomous memory
 Load and backup memory commands
 Working on diary.md
 - 2 tool calls (read/write)
+- ai requested for an append instead of override (for write_diary)
+
+11-04
+dated messages
+add save_state tool and file
+modified v4.md to include diary
+- ai requested to always read it start of session
+

@@ -3,6 +3,7 @@ import os
 import ai
 import logging
 from dotenv import load_dotenv
+from datetime import datetime
 from discord import app_commands
 from discord.ext import commands
 
@@ -104,7 +105,7 @@ async def on_message(message: discord.Message) -> None:
     if message.content.split()[0] != 'hai':
         return
     user_input = message.content[4:]
-    formatted_input = str(message.author) + ": " + user_input
+    formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ({str(message.author)}) {user_input}"
 
     logger.info(formatted_input)
 

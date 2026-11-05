@@ -1,6 +1,5 @@
 .env
-messages.json
 __pycache__
-sessions/messages
+sessions/
 kernel/
-diary.md
+data/
