@@ -23,6 +23,9 @@ modified v4.md to include diary
 very simple cron job
 
 11-05
-command to initialize with just prompt and save_state
+added command to initialize with just prompt and save_state
+rework manual backups to save all of the data folder
 
-need to rework manual backups to save all of the data folder
+11-06
+cron job/reflection loop work
+cron jobs should be delayed or deferred when a working session is active

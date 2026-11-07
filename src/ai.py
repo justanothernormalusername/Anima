@@ -5,6 +5,7 @@ import os
 import json
 import asyncio
 import tools
+import shutil
 
 load_dotenv()
 API_KEY = os.getenv("HACKCLUBAI_API_KEY")
@@ -56,9 +57,12 @@ def make_request() -> requests.models.Response:
         }
     )
 
-def dump_memory(filepath: str = "data/messages.json") -> None:
-    with open(filepath, "w") as f:
+def dump_memory(filepath: str = "data/", include_diary: bool = False) -> None:
+    with open(filepath + "messages.json", "w") as f:
         json.dump(messages, f, indent=4)
+    if include_diary:
+        shutil.copy2("data/diary.md", filepath)
+        shutil.copy2("data/save_state.md", filepath)
 
 async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
     # print(messages)
@@ -103,7 +107,7 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
                 })
                 dump_memory()
 
-                yield "tool_call", f"Called tool {func_name}"
+                yield "tool_call", f"[{func_name}] {response_reasoning}"
         else:
             return
 
@@ -111,5 +115,5 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
 
 async def reflect() -> None:
     load_memory("data/reflection_messages.json")
-    raise Exception("Work in progress")
+    raise NotImplementedError("Work in progress")
     dump_memory("data/reflection_messages.json")

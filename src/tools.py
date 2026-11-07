@@ -18,7 +18,7 @@ tools = [
                 "properties": {
                     "diary_content": {
                         "type": "string",
-                        "description": "Text to write into to your diary"
+                        "description": "Text to write into to your diary - quick notes to yourself, fragments fine, no need to be complete or tidy"
                     }
                 },
                 "required": ["diary_content"]
@@ -30,6 +30,13 @@ tools = [
         "function": {
             "name": "get_datetime",
             "description": "Returns the current date and time as a string"
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_save_state",
+            "description": "Returns your previously written save_state in plaintext"
         }
     },
     {
@@ -63,6 +70,11 @@ def write_diary(diary_content: str) -> None:
 def get_datetime() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+def read_save_state() -> str:
+    with open("data/save_state.md", "r", encoding="utf-8") as f:
+        content = f.read()
+    return content
+
 def write_save_state(save_state_content: str) -> None:
     with open("data/save_state.md", "w", encoding="utf-8") as f:
         f.write(save_state_content)
@@ -72,6 +84,7 @@ TOOL_MAPPING = {
     "read_diary": read_diary,
     "write_diary": write_diary,
     "get_datetime": get_datetime,
+    "read_save_state": read_save_state,
     "write_save_state": write_save_state
 }
 

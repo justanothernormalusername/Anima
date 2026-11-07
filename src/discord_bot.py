@@ -4,6 +4,7 @@ import ai
 import logging
 from dotenv import load_dotenv
 from datetime import datetime
+from pathlib import Path
 from discord import app_commands
 from discord.ext import commands, tasks
 
@@ -104,11 +105,12 @@ async def load_memory(interaction: discord.Interaction, filepath: str) -> None:
     await interaction.response.send_message(f"New memories loaded at *{filepath}*")
 
 @bot.tree.command(name="backup_memory", description="Backup the current memory file")
-async def backup_memory(interaction: discord.Interaction, filename: str) -> None:
-    filepath = "sessions/messages/" + filename
-    ai.dump_memory(filepath)
-    logger.info("Current memory backed up at " + filepath)
-    await interaction.response.send_message(f"Current memory backed up at *{filepath}*")
+async def backup_memory(interaction: discord.Interaction, directory_name: str) -> None:
+    dir_path = Path("sessions/" + directory_name)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    ai.dump_memory(str(dir_path) + "/", include_diary=True)
+    logger.info("Current memory & diary backed up at " + str(dir_path))
+    await interaction.response.send_message(f"Current memory backed up at *{dir_path}*")
 
 @bot.tree.command(name="new_session", description="Create a new session with cleared memory and save_state.md imported")
 async def new_session(interaction: discord.Interaction) -> None:
@@ -123,6 +125,23 @@ async def reflect(interaction: discord.Interaction) -> None:
     return
 
 
+async def chat_and_send(raw_input: str, channel: discord.abc.Messageable) -> None:
+    """Helper function that takes a raw input and sends the agent output to the channel"""
+    logger.info(raw_input)
+    
+    # Iterates over the get_response async generator
+    async for response_message, response_reasoning in ai.get_response(raw_input):
+        # If model did a tool call
+        if response_message == "tool_call":
+            logger.info("Reasoning: " + response_reasoning)
+        else:  # No tool call, normal output
+            if response_reasoning:
+                logger.info("Reasoning: " + response_reasoning)
+            logger.info("Bot: " + response_message)
+
+            await split_and_send(response_message, channel)
+
+
 @bot.event
 async def on_message(message: discord.Message) -> None:
     if message.author == bot.user:
@@ -132,19 +151,7 @@ async def on_message(message: discord.Message) -> None:
     user_input = message.content[4:]
     formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ({str(message.author)}) {user_input}"
 
-    logger.info(formatted_input)
-
-    # Iterates over the get_response async generator
-    async for response_message, response_reasoning in ai.get_response(formatted_input):
-        # If model did a tool call
-        if response_message == "tool_call":
-            logger.info("Bot: " + response_reasoning)
-        else:  # No tool call, normal output
-            if response_reasoning:
-                logger.info("Reasoning: " + response_reasoning)
-            logger.info("Bot: " + response_message)
-
-            await split_and_send(response_message, message.channel)
+    await chat_and_send(formatted_input, message.channel)
 
 
 # Auto loop tasks
@@ -153,27 +160,15 @@ async def auto_loop() -> None:
     CHANNEL_ID = os.getenv("CHANNEL_ID")
     if CHANNEL_ID is None:
         raise ValueError("Invalid GUILD_ID")
+    
     channel = await bot.fetch_channel(int(CHANNEL_ID))
+    if not isinstance(channel, discord.abc.Messageable):
+        raise TypeError("Channel does not support sending messages")
     
     system_input = "Running looping agent activation"
     print("Running cron job")
 
     formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] (System) {system_input}"
-    
-    logger.info(formatted_input)
-    
-    # Iterates over the get_response async generator
-    async for response_message, response_reasoning in ai.get_response(formatted_input):
-        # If model did a tool call
-        if response_message == "tool_call":
-            logger.info("Bot: " + response_reasoning)
-        else:  # No tool call, normal output
-            if response_reasoning:
-                logger.info("Reasoning: " + response_reasoning)
-            logger.info("Bot: " + response_message)
 
-            if isinstance(channel, discord.abc.Messageable):
-                await split_and_send(response_message, channel)
-            else:
-                raise TypeError("Channel does not support sending messages")
+    await chat_and_send(formatted_input, channel)
 
