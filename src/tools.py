@@ -58,6 +58,13 @@ tools = [
     }
 ]
 
+
+# Function to execute every tool call function when given the name and arguments
+def execute_func(func_name: str, *func_args: str) -> None | str | dict | list:
+    return TOOL_MAPPING[func_name](**func_args)
+
+
+
 def read_diary() -> str:
     with open("data/diary.md", "r", encoding="utf-8") as f:
         content = f.read()

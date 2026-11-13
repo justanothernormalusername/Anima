@@ -5,7 +5,6 @@ import logging
 from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
-from discord import app_commands
 from discord.ext import commands, tasks
 
 load_dotenv()
@@ -13,8 +12,6 @@ load_dotenv()
 GUILD_ID = os.getenv("GUILD_ID")
 if GUILD_ID is None:
     raise ValueError("Invalid GUILD_ID")
-
-CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 # Guild ID for testing server
 TEST_GUILD = discord.Object(id=GUILD_ID)
@@ -28,6 +25,12 @@ intents.members = True  # Enables access to member data
 intents.message_content = True  # Allows bot to read messages (required for most bots)
 intents.presences = True  # Allows bot to see online/offline status
 bot = commands.Bot(command_prefix='hai ', intents=intents)
+
+CHANNEL_ID: int = int(os.getenv("CHANNEL_ID") or 0)
+assert CHANNEL_ID, "Invalid CHANNEL_ID"
+
+CHANNEL: discord.abc.Messageable | None = None
+
 
 
 
@@ -82,6 +85,14 @@ async def on_ready() -> None:  # async is a function that runs in the background
     bot.tree.copy_global_to(guild=TEST_GUILD)
     await bot.tree.sync(guild=TEST_GUILD)
 
+    # Sets the global channel variable
+    global CHANNEL
+    fetched_channel = bot.get_channel(CHANNEL_ID)
+    if not isinstance(fetched_channel, discord.abc.Messageable):
+        raise TypeError("Channel does not support sending messages")
+
+    CHANNEL = fetched_channel
+
     # Starts the cron job
     # auto_loop.start()
 
@@ -119,16 +130,15 @@ async def new_session(interaction: discord.Interaction) -> None:
     await interaction.response.send_message("Memories cleared and save state appended")
 
 
-@bot.tree.command(name="reflect", description="Trigger agent reflection")
-async def reflect(interaction: discord.Interaction) -> None:
-    await ai.reflect()
-    return
+@bot.tree.command(name="run_reflection", description="Trigger agent reflection")
+async def run_reflection(interaction: discord.Interaction) -> None:
+    await auto_loop()
 
 
 async def chat_and_send(raw_input: str, channel: discord.abc.Messageable) -> None:
     """Helper function that takes a raw input and sends the agent output to the channel"""
     logger.info(raw_input)
-    
+
     # Iterates over the get_response async generator
     async for response_message, response_reasoning in ai.get_response(raw_input):
         # If model did a tool call
@@ -154,21 +164,18 @@ async def on_message(message: discord.Message) -> None:
     await chat_and_send(formatted_input, message.channel)
 
 
-# Auto loop tasks
-@tasks.loop(minutes=120)
-async def auto_loop() -> None:
-    CHANNEL_ID = os.getenv("CHANNEL_ID")
-    if CHANNEL_ID is None:
-        raise ValueError("Invalid GUILD_ID")
-    
-    channel = await bot.fetch_channel(int(CHANNEL_ID))
-    if not isinstance(channel, discord.abc.Messageable):
-        raise TypeError("Channel does not support sending messages")
-    
+async def reflect(channel_id: discord.abc.Messageable) -> None:
     system_input = "Running looping agent activation"
     print("Running cron job")
 
     formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] (System) {system_input}"
 
-    await chat_and_send(formatted_input, channel)
+    await chat_and_send(formatted_input, channel_id)
+
+
+# Auto loop tasks
+@tasks.loop(minutes=120)
+async def auto_loop() -> None:
+    assert CHANNEL, "Channel uninitialized"
+    await reflect(CHANNEL)
 

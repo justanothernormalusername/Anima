@@ -64,25 +64,26 @@ def dump_memory(filepath: str = "data/", include_diary: bool = False) -> None:
         shutil.copy2("data/diary.md", filepath)
         shutil.copy2("data/save_state.md", filepath)
 
+
 async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
     # print(messages)
     messages.append({"role": "user", "content": user_input})
 
     # Loops until model finishes tool calling chain
     while True:
-        response = await asyncio.to_thread(make_request)
+        response: requests.Response = await asyncio.to_thread(make_request)
         # print(response.text)
 
         # Handles api errors
         try:
-            message = response.json()["choices"][0]["message"]
+            message: dict = response.json()["choices"][0]["message"]
         except (requests.exceptions.JSONDecodeError, KeyError):
             print(response.text)
             raise
 
         messages.append(message)
         dump_memory()
-        response_reasoning = message["reasoning"]
+        response_reasoning: str = message.get("reasoning") or "No Reasoning Provided"
 
         # Yields model output if it produced content
         if "content" in message and message["content"]:
@@ -95,15 +96,30 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
             for tool_call in message["tool_calls"]:
                 call_id = tool_call["id"]
                 func_name = tool_call["function"]["name"]
-                func_args = json.loads(tool_call["function"]["arguments"])
 
-                # Calls the tool function through the tools module's mapping
-                result = tools.TOOL_MAPPING[func_name](**func_args)
+                # Parses the model's tool call from JSON to python
+                try:
+                    func_args = json.loads(tool_call["function"]["arguments"])
+
+                    if func_name not in tools.TOOL_MAPPING:
+                        result = "Tool not found"
+                        break
+
+
+                    try:
+                        # Calls the tool function through the tools module's mapping
+                        result = tools.execute_func(func_name, func_args)
+                    except TypeError:
+                        result = "Invalid arguments"
+                    except Exception:
+                        logger.
+                except json.JSONDecodeError:
+                    result = "Malformed JSON in tool output"
 
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call_id,
-                    "content": json.dumps(result)
+                    "content": result if isinstance(result, str) else json.dumps(result)
                 })
                 dump_memory()
 
@@ -112,8 +128,15 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
             return
 
 
-
 async def reflect() -> None:
+    reflection_messages = [{"role": "system", "content": PROMPT}]
+    reflection_messages.append({"role": "system", "content": "You are in a reflection loop. Take this opportunity to reflect on what you currently know and understand to extrapolate any useful conclusions. You have access to all your tools, including your diary, so use it if you want to save anything from this context - messages will not persist after reflection ends."})
+
+    get_response(f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] (System) {system_input})")
+
+    with open("data/reflection_messages.json", "w") as f:
+        json.dump(messages, f, indent=4)
     load_memory("data/reflection_messages.json")
-    raise NotImplementedError("Work in progress")
+    
     dump_memory("data/reflection_messages.json")
+
