@@ -142,8 +142,8 @@ async def chat_and_send(raw_input: str, channel: discord.abc.Messageable) -> Non
     # Iterates over the get_response async generator
     async for response_message, response_reasoning in ai.get_response(raw_input):
         # If model did a tool call
-        if response_message == "tool_call":
-            logger.info("Reasoning: " + response_reasoning)
+        if response_message == "no_print":
+            logger.info(response_reasoning)
         else:  # No tool call, normal output
             if response_reasoning:
                 logger.info("Reasoning: " + response_reasoning)

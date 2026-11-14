@@ -92,38 +92,19 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
 
         # Runs only if a tool has been called
         if "tool_calls" in message and message["tool_calls"]:
-            # print(message["tool_calls"])
+            # To log reasoning before tool call
+            yield "no_print", "Reasoning: " + response_reasoning
             for tool_call in message["tool_calls"]:
                 call_id = tool_call["id"]
-                func_name = tool_call["function"]["name"]
-
-                # Parses the model's tool call from JSON to python
-                try:
-                    func_args = json.loads(tool_call["function"]["arguments"])
-
-                    if func_name not in tools.TOOL_MAPPING:
-                        result = "Tool not found"
-                        break
-
-
-                    try:
-                        # Calls the tool function through the tools module's mapping
-                        result = tools.execute_func(func_name, func_args)
-                    except TypeError:
-                        result = "Invalid arguments"
-                    except Exception:
-                        logger.
-                except json.JSONDecodeError:
-                    result = "Malformed JSON in tool output"
+                tool_output = tools.execute_func(tool_call)
 
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call_id,
-                    "content": result if isinstance(result, str) else json.dumps(result)
+                    "content": tool_output
                 })
                 dump_memory()
-
-                yield "tool_call", f"[{func_name}] {response_reasoning}"
+                yield "no_print", f"Called tool [{tool_call['function']['name']}]"
         else:
             return
 

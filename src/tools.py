@@ -1,4 +1,9 @@
+import json
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
 
 tools = [
     {
@@ -60,9 +65,35 @@ tools = [
 
 
 # Function to execute every tool call function when given the name and arguments
-def execute_func(func_name: str, *func_args: str) -> None | str | dict | list:
-    return TOOL_MAPPING[func_name](**func_args)
+def execute_func(tool_call: dict) -> str | dict | list:
+    func_name = tool_call["function"]["name"]
 
+    try:
+        func_args = json.loads(tool_call["function"]["arguments"])
+    except json.JSONDecodeError:
+        return "Malformed JSON in tool input"
+
+    if not isinstance(func_args, dict):
+        return "Input arguments must a JSON object"
+
+    try:
+        tool_func = TOOL_MAPPING[func_name]
+    except KeyError:
+        return "Tool not found"
+
+    try:
+        result = tool_func(**func_args)
+    except Exception as e:
+        logger.exception("Exception when running tool call")
+        return f"{type(e).__name__} when running tool call: {e}"
+
+    if result is None:
+        return "Tool call successful"
+    
+    if isinstance(result, str):
+        return result
+    else:
+        return json.dumps(result, default=str)
 
 
 def read_diary() -> str:
