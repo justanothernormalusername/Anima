@@ -6,6 +6,9 @@ import json
 import asyncio
 import tools
 import shutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 API_KEY = os.getenv("HACKCLUBAI_API_KEY")
@@ -17,6 +20,8 @@ MODEL = "openai/gpt-6-luna"
 MODEL = "minimax/minimax-m2-her"
 
 MODEL = "deepseek/deepseek-v4.1-flash-1017:nitro"
+
+MAX_CALLS_IN_TOOL_SEQUENCE = 20
 
 with open("kernel/v0.4.md") as f:
     PROMPT = f.read()
@@ -69,8 +74,8 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
     # print(messages)
     messages.append({"role": "user", "content": user_input})
 
-    # Loops until model finishes tool calling chain
-    while True:
+    # Loops until model finishes tool calling chain or it exceeds the max interations
+    for _ in range(MAX_CALLS_IN_TOOL_SEQUENCE):
         response: requests.Response = await asyncio.to_thread(make_request)
         # print(response.text)
 
@@ -93,7 +98,7 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
         # Runs only if a tool has been called
         if "tool_calls" in message and message["tool_calls"]:
             # To log reasoning before tool call
-            yield "no_print", "Reasoning: " + response_reasoning
+            logger.info("Reasoning: " + response_reasoning)
             for tool_call in message["tool_calls"]:
                 call_id = tool_call["id"]
                 tool_output = tools.execute_func(tool_call)
@@ -104,9 +109,13 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
                     "content": tool_output
                 })
                 dump_memory()
-                yield "no_print", f"Called tool [{tool_call['function']['name']}]"
+                logger.info(f"Called tool [{tool_call['function']['name']}]")
         else:
             return
+
+    # Runs if model exceeds the max iterations of tool calls
+    logger.warning("Tool call stack loop limit reached. Returning...")
+    return
 
 
 async def reflect() -> None:
