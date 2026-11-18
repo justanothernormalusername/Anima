@@ -72,6 +72,11 @@ async def split_and_send(message_out: str, channel: discord.abc.Messageable) -> 
 
         return chunks
 
+    # Cancels message if empty
+    if not message_out.strip():
+        logger.warning("Model response content returned only whitespace, cancelling discord send")
+        return
+
     if len(message_out) > 0:
         for chunk in split_discord_message(message_out):
             await channel.send(chunk)

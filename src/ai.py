@@ -73,11 +73,11 @@ def dump_memory(filepath: str = "data/", include_diary: bool = False) -> None:
 async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
     # print(messages)
     messages.append({"role": "user", "content": user_input})
+    tool_call_count = 0
 
     # Loops until model finishes tool calling chain or it exceeds the max interations
-    for _ in range(MAX_CALLS_IN_TOOL_SEQUENCE):
+    while True:
         response: requests.Response = await asyncio.to_thread(make_request)
-        # print(response.text)
 
         # Handles api errors
         try:
@@ -101,7 +101,13 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
             logger.info("Reasoning: " + response_reasoning)
             for tool_call in message["tool_calls"]:
                 call_id = tool_call["id"]
-                tool_output = tools.execute_func(tool_call)
+
+                # Runs only when model does not exceed the max iterations of tool calls
+                if tool_call_count < MAX_CALLS_IN_TOOL_SEQUENCE:
+                    tool_output = tools.execute_func(tool_call)
+                else:
+                    logger.warning("Tool call stack loop limit reached. Returning error strings to model")
+                    tool_output = "Tool call stack loop limit reached - tools temporarily disabled for the remaining call chain"
 
                 messages.append({
                     "role": "tool",
@@ -112,10 +118,7 @@ async def get_response(user_input: str) -> AsyncGenerator[tuple[str, str]]:
                 logger.info(f"Called tool [{tool_call['function']['name']}]")
         else:
             return
-
-    # Runs if model exceeds the max iterations of tool calls
-    logger.warning("Tool call stack loop limit reached. Returning...")
-    return
+        tool_call_count += 1
 
 
 async def reflect() -> None:
