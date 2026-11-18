@@ -1,6 +1,7 @@
 import discord
 import os
 import ai
+import memory
 import logging
 from dotenv import load_dotenv
 from datetime import datetime
@@ -16,7 +17,7 @@ if GUILD_ID is None:
 # Guild ID for testing server
 TEST_GUILD = discord.Object(id=GUILD_ID)
 
-logging.basicConfig(level=logging.INFO)
+discord.utils.setup_logging(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Permissions
@@ -72,7 +73,7 @@ async def split_and_send(message_out: str, channel: discord.abc.Messageable) -> 
 
         return chunks
 
-    # Cancels message if empty
+    # Cancels message if contains only whitespace/new lines
     if not message_out.strip():
         logger.warning("Model response content returned only whitespace, cancelling discord send")
         return
@@ -101,7 +102,7 @@ async def on_ready() -> None:  # async is a function that runs in the background
     # Starts the cron job
     # auto_loop.start()
 
-    print(f'{bot.user} has connected to Discord')
+    logger.info(f'{bot.user} has connected to Discord')
 
 
 @bot.tree.command(name="info", description="Displays the full overview and status")
@@ -116,7 +117,7 @@ async def change_model(interaction: discord.Interaction, model: str) -> None:
 
 @bot.tree.command(name="load_memory", description="Load a specific memory file")
 async def load_memory(interaction: discord.Interaction, filepath: str) -> None:
-    ai.messages = ai.load_memory(filepath)
+    memory.working_messages = memory.load_memory(filepath)
     logger.info("New memories loaded at " + filepath)
     await interaction.response.send_message(f"New memories loaded at *{filepath}*")
 
@@ -124,32 +125,34 @@ async def load_memory(interaction: discord.Interaction, filepath: str) -> None:
 async def backup_memory(interaction: discord.Interaction, directory_name: str) -> None:
     dir_path = Path("sessions/" + directory_name)
     dir_path.mkdir(parents=True, exist_ok=True)
-    ai.dump_memory(str(dir_path) + "/", include_diary=True)
+    memory.dump_memory(memory.working_messages, str(dir_path) + "/", include_diary=True)
     logger.info("Current memory & diary backed up at " + str(dir_path))
     await interaction.response.send_message(f"Current memory backed up at *{dir_path}*")
 
 @bot.tree.command(name="new_session", description="Create a new session with cleared memory and save_state.md imported")
 async def new_session(interaction: discord.Interaction) -> None:
-    ai.messages = ai.init_memory(True)
+    memory.working_messages = memory.init_memory(True)
     logger.info("Memories cleared and save state appended")
     await interaction.response.send_message("Memories cleared and save state appended")
-
 
 @bot.tree.command(name="run_reflection", description="Trigger agent reflection")
 async def run_reflection(interaction: discord.Interaction) -> None:
     await auto_loop()
+    await interaction.response.send_message("Running reflection loop")
 
 
-async def chat_and_send(raw_input: str, channel: discord.abc.Messageable) -> None:
+async def chat_and_send(raw_input: str, messages: list, channel: discord.abc.Messageable) -> None:
     """Helper function that takes a raw input and sends the agent output to the channel"""
-    logger.info(raw_input)
+    logger.info(f"Raw input of {len(raw_input)} characters")
+    logger.debug(f"User: {raw_input!r}")
 
     # Iterates over the get_response async generator
-    async for response_message, response_reasoning in ai.get_response(raw_input):
+    async for response_message, response_reasoning in ai.get_response(messages, raw_input):
         # Only yields when a message needs to be send, tool calls stay local
         if response_reasoning:
-            logger.info("Reasoning: " + response_reasoning)
-        logger.info("Bot: " + response_message)
+            logger.debug(f"Reasoning: {response_reasoning!r}")
+        logger.info(f"Response of {len(response_message)} characters")
+        logger.debug(f"Bot: {response_message!r}")
 
         await split_and_send(response_message, channel)
 
@@ -163,17 +166,17 @@ async def on_message(message: discord.Message) -> None:
     user_input = message.content[4:]
     formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] ({str(message.author)}) {user_input}"
 
-    await chat_and_send(formatted_input, message.channel)
+    await chat_and_send(formatted_input, memory.working_messages, message.channel)
 
 
 async def reflect(channel_id: discord.abc.Messageable) -> None:
-    system_input = "Running looping agent activation"
-    print("Running cron job")
+    reflection_messages = [{"role": "system", "content": memory.PROMPT}]
+    reflection_messages.append({"role": "system", "content": "You are in a reflection loop. Take this opportunity to reflect on what you currently know and understand to extrapolate any useful conclusions. You have access to all your tools, including your diary, so use it if you want to save anything from this context - messages will not persist after reflection ends."})
 
-    formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] (System) {system_input}"
+    formatted_input = f"[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] (System) Running recurring reflection"
+    memory.dump_memory(reflection_messages, "data/reflection_messages.json")
 
-    await chat_and_send(formatted_input, channel_id)
-
+    await chat_and_send(formatted_input, reflection_messages, channel_id)
 
 # Auto loop tasks
 @tasks.loop(minutes=120)

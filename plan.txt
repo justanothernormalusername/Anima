@@ -29,3 +29,6 @@ rework manual backups to save all of the data folder
 11-06
 cron job/reflection loop work
 cron jobs should be delayed or deferred when a working session is active
+
+reasoning switch: on or off to print to discord
+command to switch
