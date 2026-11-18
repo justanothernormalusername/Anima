@@ -36,7 +36,7 @@ def make_request(messages: list) -> requests.models.Response:
     )
 
 
-async def get_response(messages: list, user_input: str) -> AsyncGenerator[tuple[str, str]]:
+async def get_response(messages: list, user_input: str, yield_reasoning: bool = False) -> AsyncGenerator[tuple[str, str]]:
     # print(messages)
     messages.append({"role": "user", "content": user_input})
     tool_call_count = 0
@@ -65,6 +65,8 @@ async def get_response(messages: list, user_input: str) -> AsyncGenerator[tuple[
         if "tool_calls" in message and message["tool_calls"]:
             # To log reasoning before tool call
             logger.debug("Reasoning: " + response_reasoning)
+            if yield_reasoning:
+                yield f"```{response_reasoning}```", ""
             for tool_call in message["tool_calls"]:
                 call_id = tool_call["id"]
 

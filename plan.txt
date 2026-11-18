@@ -32,3 +32,5 @@ cron jobs should be delayed or deferred when a working session is active
 
 reasoning switch: on or off to print to discord
 command to switch
+
+modify split and send function to support code (reasoning) chunks

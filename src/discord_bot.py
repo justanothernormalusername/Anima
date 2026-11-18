@@ -32,7 +32,7 @@ assert CHANNEL_ID, "Invalid CHANNEL_ID"
 
 CHANNEL: discord.abc.Messageable | None = None
 
-
+show_reasoning = False
 
 
 def run() -> None:
@@ -135,10 +135,20 @@ async def new_session(interaction: discord.Interaction) -> None:
     logger.info("Memories cleared and save state appended")
     await interaction.response.send_message("Memories cleared and save state appended")
 
+@bot.tree.command(name="toggle_reasoning", description="Toggles the bot to always print its reasoning")
+async def toggle_reasoning(interaction: discord.Interaction) -> None:
+    global show_reasoning
+    show_reasoning = not show_reasoning
+    logger.info(f"show_reasoning toggled to {show_reasoning}")
+    await interaction.response.send_message(f"Show reasoning toggled to **{show_reasoning}**")
+
 @bot.tree.command(name="run_reflection", description="Trigger agent reflection")
 async def run_reflection(interaction: discord.Interaction) -> None:
+    logger.info(f"Running reflection loop...")
+    await interaction.response.send_message("Running reflection loop...")
     await auto_loop()
-    await interaction.response.send_message("Running reflection loop")
+    logger.info(f"Reflection complete")
+    await interaction.followup.send("Reflection complete")
 
 
 async def chat_and_send(raw_input: str, messages: list, channel: discord.abc.Messageable) -> None:
@@ -147,10 +157,14 @@ async def chat_and_send(raw_input: str, messages: list, channel: discord.abc.Mes
     logger.debug(f"User: {raw_input!r}")
 
     # Iterates over the get_response async generator
-    async for response_message, response_reasoning in ai.get_response(messages, raw_input):
+    async for response_message, response_reasoning in ai.get_response(messages, raw_input, show_reasoning):
         # Only yields when a message needs to be send, tool calls stay local
         if response_reasoning:
             logger.debug(f"Reasoning: {response_reasoning!r}")
+
+            if show_reasoning:
+                await split_and_send(f"```{response_reasoning}```", channel)
+
         logger.info(f"Response of {len(response_message)} characters")
         logger.debug(f"Bot: {response_message!r}")
 
